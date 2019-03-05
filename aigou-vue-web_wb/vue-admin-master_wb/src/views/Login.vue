@@ -1,7 +1,7 @@
 <template>
     <el-container>
         <el-header>
-            <div id="weather-view-he"></div>
+            <!--<div id="weather-view-he"></div>-->
         </el-header>
         <el-main>
             <el-form :model="ruleForm2" :rules="rules2" ref="ruleForm2" label-position="left" label-width="0px"
