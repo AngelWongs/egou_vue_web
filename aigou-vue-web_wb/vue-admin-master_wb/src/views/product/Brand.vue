@@ -115,7 +115,8 @@
                 brands: [],
                 productType: [],
                 productType2: [],
-                staticIp:"http://192.168.1.113",
+                staticIp:"http://192.168.1.100",
+                // staticIp:"http://172.16.7.98/",
                 productTypeSelectProps: {
                     value: 'id',
                     label: 'name',

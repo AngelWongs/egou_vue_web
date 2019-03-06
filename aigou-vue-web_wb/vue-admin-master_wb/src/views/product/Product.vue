@@ -12,6 +12,15 @@
                 <el-form-item>
                     <el-button type="primary" @click="handleAdd">新增</el-button>
                 </el-form-item>
+                <el-form-item>
+                    <el-button type="primary" @click="displayPropertyManagement">显示属性管理</el-button>
+                </el-form-item>
+                <el-form-item>
+                    <el-button type="primary" @click="handleAdd">上架</el-button>
+                </el-form-item>
+                <el-form-item>
+                    <el-button type="primary" @click="handleAdd">下架</el-button>
+                </el-form-item>
             </el-form>
         </el-col>
 
@@ -44,7 +53,8 @@ productType.name
 state
 description
         -->
-        <el-table :data="products" highlight-current-row v-loading="listLoading" @selection-change="selsChange"
+        <el-table :data="products" highlight-current-row v-loading="listLoading" @row-click="selectRow"
+                  @selection-change="selsChange"
                   style="width: 100%;">
             <el-table-column type="selection" width="55">
             </el-table-column>
@@ -117,10 +127,10 @@ description
                 </el-form-item>
                 <el-form-item label="详情" prop="productExt.richContent">
                     <!--<el-input v-model="form.productExt.richContent" auto-complete="off"></el-input>-->
-                        <div class="edit_container">
-                            <quill-editor v-model="form.productExt.richContent" ref="myQuillEditor" class="editer"
-                                          :options="editorOption" @ready="onEditorReady($event)"></quill-editor>
-                        </div>
+                    <div class="edit_container">
+                        <quill-editor v-model="form.productExt.richContent" ref="myQuillEditor" class="editer"
+                                      :options="editorOption" @ready="onEditorReady($event)"></quill-editor>
+                    </div>
                 </el-form-item>
             </el-form>
             <div slot="footer" class="dialog-footer">
@@ -129,6 +139,23 @@ description
                 <el-button type="primary" @click.native="editSubmit" :loading="editLoading">提交</el-button>
             </div>
         </el-dialog>
+<!--显示属性管理界面-->
+        <el-dialog title="显示属性管理" :before-close="handleClose" v-model="displayManagementformVisible"
+                   :close-on-click-modal="false">
+                    <el-card class="box-card" >
+                        <div v-for="specification in specificationByProductTypeId"
+                             class="text item">
+                            {{ specification.specName }}:
+                            <el-input auto-complete="off" v-model="specification.value"></el-input>
+                        </div>
+                    </el-card>
+            <div slot="footer" class="dialog-footer">
+                <!--<el-button @click.native="buttonHandleChange">取消</el-button>-->
+                <el-button @click.native="displayManagementformVisible = false">取消</el-button>
+                <el-button type="primary" @click.native="displayManagementSubmit" :loading="editLoading">提交</el-button>
+            </div>
+        </el-dialog>
+
     </section>
 </template>
 
@@ -141,11 +168,11 @@ description
     import "quill/dist/quill.bubble.css"
 
     export default {
-        components: {ElSelectDropdown,quillEditor},
-        computed:{
-                editor() {
-                    return this.$refs.myQuillEditor.quill
-                }
+        components: {ElSelectDropdown, quillEditor},
+        computed: {
+            editor() {
+                return this.$refs.myQuillEditor.quill
+            }
         },
         data() { //数据
             return {
@@ -156,6 +183,9 @@ description
                 products: [],
                 productType: [],
                 productType2: [],
+                selectCCurrentRow: null,
+                //v-for="specification in specificationByProductTypeId
+                specificationByProductTypeId: [],
                 staticIp: "http://192.168.1.113",
                 productTypeSelectProps: {
                     value: 'id',
@@ -168,6 +198,7 @@ description
                 sels: [],//列表选中列
                 fileList2: [],
                 formVisible: false,//编辑界面是否显示
+                displayManagementformVisible: false,//编辑界面是否显示
                 editLoading: false,
                 formRules: {
                     name: [
@@ -181,11 +212,66 @@ description
                     subName: '',
                     state: '',
                     productTypeId: 0,
-                    productExt: {"id":"","description": "", "richContent": ""},
+                    productExt: {"id": "", "description": "", "richContent": ""},
                 },
             }
         },
         methods: { //方法\
+            //属性管理监听提交方法
+            displayManagementSubmit:function(){
+                console.debug("---------this.selectCCurrentRow.id-----------");
+                console.debug(this.selectCCurrentRow);
+                console.debug("---------this.specificationByProductTypeId-----------");
+                console.debug(this.specificationByProductTypeId);
+                this.editLoading = true;
+                let param = {"productId":this.selectCCurrentRow.id,"specificationByProductTypeId":this.specificationByProductTypeId};
+                //根据productid添加显示属性
+                this.$http.post("/product/productExt/saveSpecificationByProductTypeId",param)//product.id
+                    .then((res) => {
+                        console.debug(res);
+                        this.editLoading = false;
+                        if (res.data.success){
+                            this.$message({
+                                message: res.data.msg,
+                                type: 'success'
+                            });
+                        } else {
+                            this.$message({
+                                message: res.data.msg,
+                                type: 'error'
+                            });
+                        }
+                        this.displayManagementformVisible = false;
+                    });
+            },
+            selectRow: function (row, column, event) {
+                if (row) {
+                    this.selectCCurrentRow = row;
+                }
+            },
+            //点击显示管理监听方法
+            displayPropertyManagement: function (row) {
+
+                console.debug("----this.selectCCurrentRow---");
+                console.debug(this.selectCCurrentRow);
+                console.debug("----row---");
+                console.debug(row);
+                if (this.selectCCurrentRow) {
+                    this.displayManagementformVisible = true;
+                    this.$http.get("/product/specification/selectAllSpecificationByProductTypeId/" + this.selectCCurrentRow.productTypeId+"/"+this.selectCCurrentRow.id)
+                        .then((res) => {
+                            this.specificationByProductTypeId = res.data;
+                            console.debug("--------this.specificationByProductTypeId---------");
+                            console.debug(this.specificationByProductTypeId);
+                        });
+                }else{
+                    this.$message({
+                        message: '请选中商品进行显示属性编辑',
+                        type: 'warning'
+                    });
+                    return null;
+                }
+            },
             //富文本
             onEditorReady(editor) {
             },
@@ -194,6 +280,7 @@ description
                 //后台获取数据
                 this.$http.post("/product/brand/getProductTypeAllPid", row)
                     .then((res) => {
+                        console.debug("-----getProductTypeAllPid请求返回-------");
                         console.debug(res);
                         this.productType2 = res.data.object;
                     });
@@ -324,7 +411,7 @@ description
                     name: '',
                     subName: '',
                     state: '',
-                    productExt: {"id":"","description": "", "richContent": ""},
+                    productExt: {"id": "", "description": "", "richContent": ""},
                     productTypeId: 0,
 
                     //     value: '选项1',
