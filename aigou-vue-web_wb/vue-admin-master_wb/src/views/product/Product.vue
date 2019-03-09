@@ -16,6 +16,12 @@
                     <el-button type="primary" @click="displayPropertyManagement">显示属性管理</el-button>
                 </el-form-item>
                 <el-form-item>
+                    <el-button type="primary" @click="skuPropertyManagement">SKU属性管理</el-button>
+                </el-form-item>
+                <el-form-item>
+                    <el-button type="primary" @click="mediaPropertiesManagement">媒体属性管理</el-button>
+                </el-form-item>
+                <el-form-item>
                     <el-button type="primary" @click="handleAdd">上架</el-button>
                 </el-form-item>
                 <el-form-item>
@@ -139,20 +145,80 @@ description
                 <el-button type="primary" @click.native="editSubmit" :loading="editLoading">提交</el-button>
             </div>
         </el-dialog>
-<!--显示属性管理界面-->
+        <!--显示属性管理界面-->
         <el-dialog title="显示属性管理" :before-close="handleClose" v-model="displayManagementformVisible"
                    :close-on-click-modal="false">
-                    <el-card class="box-card" >
-                        <div v-for="specification in specificationByProductTypeId"
-                             class="text item">
-                            {{ specification.specName }}:
-                            <el-input auto-complete="off" v-model="specification.value"></el-input>
-                        </div>
-                    </el-card>
+            <el-card class="box-card">
+                <div v-for="specification in specificationByProductTypeId"
+                     class="text item">
+                    {{ specification.specName }}:
+                    <el-input auto-complete="off" v-model="specification.value"></el-input>
+                </div>
+            </el-card>
             <div slot="footer" class="dialog-footer">
                 <!--<el-button @click.native="buttonHandleChange">取消</el-button>-->
                 <el-button @click.native="displayManagementformVisible = false">取消</el-button>
                 <el-button type="primary" @click.native="displayManagementSubmit" :loading="editLoading">提交</el-button>
+            </div>
+        </el-dialog>
+        <!--媒体属性dialog-->
+        <el-dialog title="显示属性管理" :before-close="handleClose" v-model="mediaManagementformVisible"
+                   :close-on-click-modal="false">
+            <!--上传组件-->
+            <el-upload
+                    class="upload-demo"
+                    action="http://127.0.0.1:9527/egou/common/fastDfs/uploadFile"
+                    :on-preview="uploadHandlePreview"
+                    :on-remove="uploadHandleRemove"
+                    :file-list="fileList2"
+                    :on-success="uploadHandleSuccess"
+                    list-type="picture"
+            >
+                <el-button size="small" type="primary">点击上传</el-button>
+                <div slot="tip" class="el-upload__tip">只能上传jpg/png文件，且不超过500kb</div>
+            </el-upload>
+            <div slot="footer" class="dialog-footer">
+                <!--<el-button @click.native="buttonHandleChange">取消</el-button>-->
+                <el-button @click.native="mediaManagementformVisible = false">取消</el-button>
+                <el-button type="primary" @click.native="mediaManagementSubmit" :loading="editLoading">提交</el-button>
+            </div>
+        </el-dialog>
+        <!--SKU属性dialog-->
+        <el-dialog title="SKU属性管理" :before-close="handleClose" v-model="skuManagementformVisible"
+                   :close-on-click-modal="false">
+            <el-card class="box-card">
+                <div v-for="skus in selectAllSKUByProductTypeId"
+                     class="text item">
+                    {{skus.specName}}
+                    <div v-for="sku in skus.skuValue.length+1">
+                        <el-input auto-complete="off" v-model="skus.skuValue[sku-1]" style="width: 90%">
+                        </el-input>
+                        <el-button plain @click="skus.skuValue.splice(sku-1,1)">删除</el-button>
+                    </div>
+
+                </div>
+            </el-card>
+            <!--table-->
+            <!--动态表格-->
+            <el-table :data="skuDatas">
+                <!--cols一堆列,col哪一列-->
+                <template v-for="(col ,index) in cols">
+                    <el-table-column :prop="col.prop" sortable :label="col.label" v-if="['price','availableStock'].includes(col.prop)">
+                        <!--scope:作用域的问题-->
+                        <template scope="scope">
+                            <el-input auto-complete="off" v-model="skuDatas[scope.$index].price"  style="width: 400px" v-if="'price'===col.prop"/>
+                            <el-input auto-complete="off" v-model="skuDatas[scope.$index].availableStock" style="width: 400px" v-if="'availableStock'===col.prop"/>
+                        </template>
+                    </el-table-column>
+                    <!--只做显示-->
+                    <el-table-column :prop="col.prop" sortable :label="col.label" v-if="!['price','availableStock'].includes(col.prop)">
+                    </el-table-column>
+                </template>
+            </el-table>
+            <div slot="footer" class="dialog-footer">
+                <!--<el-button @click.native="buttonHandleChange">取消</el-button>-->
+                <el-button @click.native="skuManagementformVisible = false">取消</el-button>
+                <el-button type="primary" @click.native="skuManagementSubmit" :loading="editLoading">提交</el-button>
             </div>
         </el-dialog>
 
@@ -166,6 +232,21 @@ description
     import "quill/dist/quill.core.css"
     import "quill/dist/quill.snow.css"
     import "quill/dist/quill.bubble.css"
+
+    function calcDescartes(array) {
+        if (array.length < 2) return array[0] || [];
+        return [].reduce.call(array, function (col, set) {
+            var res = [];
+            col.forEach(function (c) {
+                set.forEach(function (s) {
+                    var t = [].concat(Array.isArray(c) ? c : [c]);
+                    t.push(s);
+                    res.push(t);
+                })
+            });
+            return res;
+        });
+    }
 
     export default {
         components: {ElSelectDropdown, quillEditor},
@@ -185,7 +266,10 @@ description
                 productType2: [],
                 selectCCurrentRow: null,
                 //v-for="specification in specificationByProductTypeId
-                specificationByProductTypeId: [],
+                specificationByProductTypeId: [],//显示属性对象数组  数组转换为后台的list
+                selectAllSKUByProductTypeId: [],////sku属性数组
+                skuDatas: [],//sku的属性
+                cols:[],//table的头的数组
                 staticIp: "http://192.168.1.113",
                 productTypeSelectProps: {
                     value: 'id',
@@ -199,6 +283,8 @@ description
                 fileList2: [],
                 formVisible: false,//编辑界面是否显示
                 displayManagementformVisible: false,//编辑界面是否显示
+                mediaManagementformVisible: false,//编辑界面是否显示
+                skuManagementformVisible: false,//sku界面是否显示
                 editLoading: false,
                 formRules: {
                     name: [
@@ -216,21 +302,150 @@ description
                 },
             }
         },
+        watch:{
+            selectAllSKUByProductTypeId:{
+                handler(curVal,oldVal){
+                    // 过滤掉用户没有填写数据的规格参数
+                    const arr = this.selectAllSKUByProductTypeId.filter(s => s.skuValue.length > 0);
+                    // 通过reduce进行累加笛卡尔积
+                    var skus =  arr.reduce((last, spec) => {
+                        const result = [];
+                        last.forEach(o => {
+                            spec.skuValue.forEach(option => {
+                                // option //一个一一个值 黄皮肤
+                                const obj = {};
+                                Object.assign(obj, o);
+                                obj[spec.specName] = option;
+                                result.push(obj);
+                            })
+                        });
+                        return result
+                    }, [{}]);
+                    // 添加不存在的列
+                    skus.forEach(function (item) {
+                        item['price'] = '';
+                        item['availableStock'] = '';
+                    });
+                    this.skuDatas = skus;
+                    // console.debug("------------skus--------------");
+                    // console.debug(skus);
+
+                    let headers = [];
+                    //现在没有一定有字段 库存 价格  颜色
+                    //skus [{"身高":170,"三维":"xxx",价格:18,库存:18,是否可用:0},{"身高":170,"三维":"xxx",价格:18,库存:18,是否可用:0}]
+                    //获取这个对象的所有的key 设置头
+                    Object.keys(this.skuDatas[0]).forEach(sku=>{
+                        let value = sku;
+                        if(sku=='price'){
+                            value = '价格'
+                        }
+                        if(sku=='availableStock'){
+                            value = '库存'
+                        }
+                        let col =  {"label":value,"prop":sku};
+                        headers.push(col);
+                    });
+                    this.cols = headers;
+                },
+                deep:true
+            }
+        },
         methods: { //方法\
+            selectRow: function (row, column, event) {
+                if (row) {
+                    this.selectCCurrentRow = row;
+                }
+            },
+            //sku管理按钮弹框监听
+            skuPropertyManagement: function () {
+                this.editLoading = true;
+                if (this.selectCCurrentRow) {
+                    this.editLoading = false;
+                    this.skuManagementformVisible = true;
+                    //后台查看是否有媒体属性
+                    this.$http.get("/product/specification/selectAllSKUSpecificationByProductTypeId/" + this.selectCCurrentRow.productTypeId)
+                        .then((res) => {
+                            this.selectAllSKUByProductTypeId = res.data;
+                            // console.debug("--------this.selectAllSKUByProductTypeId---------");
+                            // console.debug(this.selectAllSKUByProductTypeId);
+                        });
+
+                } else {
+                    this.$message({
+                        message: '请选中商品进行sku属性编辑',
+                        type: 'warning'
+                    });
+                    return null;
+                }
+            },
+            //sku的dialog提交监听
+            skuManagementSubmit: function () {
+                let productId = this.selectCCurrentRow.id;
+                let params = {"productId": productId, "selectAllSKUByProductTypeId": this.selectAllSKUByProductTypeId,"skuDatas":this.skuDatas};
+                //后台查看是否有媒体属性
+                console.debug("--------------suk-params----------------");
+                console.debug(params);
+                this.$http.post("/product/productExt/saveAllSKUSpecificationByProductTypeId",params)
+                    .then((res) => {
+                        if (res.data.success) {
+                            this.$message({
+                                message: res.data.msg,
+                                type: 'success'
+                            });
+                        } else {
+                            this.$message({
+                                message: res.data.msg,
+                                type: 'error'
+                            });
+                        }
+                    });
+            },
+            //媒体属性管理按钮监听
+            mediaPropertiesManagement: function () {
+                this.editLoading = true;
+                if (this.selectCCurrentRow) {
+                    this.editLoading = false;
+                    this.mediaManagementformVisible = true;
+                    //后台查看是否有媒体属性
+                } else {
+                    this.$message({
+                        message: '请选中商品进行media属性编辑',
+                        type: 'warning'
+                    });
+                    return null;
+                }
+            },
+            //媒体属性管理dialog提交监听
+            mediaManagementSubmit: function () {
+
+            },
+            //媒体上传监听函数
+            //         uploadHandlePreview
+            //         uploadHandleRemove
+            //         uploadHandleSuccess
+            uploadHandlePreview: function () {
+            },
+            uploadHandleRemove: function () {
+            },
+            uploadHandleSuccess: function () {
+            },
             //属性管理监听提交方法
-            displayManagementSubmit:function(){
+            displayManagementSubmit: function () {
                 console.debug("---------this.selectCCurrentRow.id-----------");
                 console.debug(this.selectCCurrentRow);
                 console.debug("---------this.specificationByProductTypeId-----------");
                 console.debug(this.specificationByProductTypeId);
                 this.editLoading = true;
-                let param = {"productId":this.selectCCurrentRow.id,"specificationByProductTypeId":this.specificationByProductTypeId};
+                let param = {
+                    "productId": this.selectCCurrentRow.id,
+                    "specificationByProductTypeId": this.specificationByProductTypeId
+                };
                 //根据productid添加显示属性
-                this.$http.post("/product/productExt/saveSpecificationByProductTypeId",param)//product.id
+                this.$http.post("/product/productExt/saveSpecificationByProductTypeId", param)//product.id
                     .then((res) => {
                         console.debug(res);
                         this.editLoading = false;
-                        if (res.data.success){
+                        if (res.data.success) {
                             this.$message({
                                 message: res.data.msg,
                                 type: 'success'
@@ -244,11 +459,6 @@ description
                         this.displayManagementformVisible = false;
                     });
             },
-            selectRow: function (row, column, event) {
-                if (row) {
-                    this.selectCCurrentRow = row;
-                }
-            },
             //点击显示管理监听方法
             displayPropertyManagement: function (row) {
 
@@ -258,13 +468,13 @@ description
                 console.debug(row);
                 if (this.selectCCurrentRow) {
                     this.displayManagementformVisible = true;
-                    this.$http.get("/product/specification/selectAllSpecificationByProductTypeId/" + this.selectCCurrentRow.productTypeId+"/"+this.selectCCurrentRow.id)
+                    this.$http.get("/product/specification/selectAllSpecificationByProductTypeId/" + this.selectCCurrentRow.productTypeId + "/" + this.selectCCurrentRow.id)
                         .then((res) => {
                             this.specificationByProductTypeId = res.data;
                             console.debug("--------this.specificationByProductTypeId---------");
                             console.debug(this.specificationByProductTypeId);
                         });
-                }else{
+                } else {
                     this.$message({
                         message: '请选中商品进行显示属性编辑',
                         type: 'warning'
@@ -370,7 +580,6 @@ description
                 // console.debug(row);
                 // if (row.logo)
 
-                this.fileList2 = [];//清空上传组件
                 //多级下拉框回显
                 this.getProductProductTreeData();
                 //北京1,2,3
@@ -385,15 +594,9 @@ description
                 // this.form.productExt.id=row.productExt.id;
                 console.debug("--=-=-============");
                 console.debug(row);
-                console.debug(this.fileList2);
                 this.formVisible = true;
                 //回显 要提交后台
                 this.form = Object.assign({}, row);
-                //回显缩略图
-                this.fileList2.push({
-                    "url": this.staticIp + row.logo,
-                    // 'lg':row.logo
-                })
             },
             //显示新增界面
             handleAdd: function () {

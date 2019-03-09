@@ -105,6 +105,7 @@
 
 <script>
     import ElSelectDropdown from "element-ui/packages/select/src/select-dropdown";
+
     export default {
         components: {ElSelectDropdown},
         data() { //数据
@@ -115,8 +116,9 @@
                 brands: [],
                 productType: [],
                 productType2: [],
-                staticIp:"http://192.168.1.100",
-                // staticIp:"http://172.16.7.98/",
+                // staticIp: "http://192.168.1.100",
+                staticIp:"http://172.16.7.98/",
+                // staticIp:"http://106.14.191.18:80",
                 productTypeSelectProps: {
                     value: 'id',
                     label: 'name',
@@ -148,13 +150,13 @@
         },
         methods: { //方法\
             //根据product查出所有pid->element Cascader 级联选择器回显
-            getProductTypeAllPid(row){
+            getProductTypeAllPid(row) {
                 //后台获取数据
-                this.$http.post("/product/brand/getProductTypeAllPid",row)
+                this.$http.post("/product/brand/getProductTypeAllPid", row)
                     .then((res) => {
                         // console.debug("qqqqqqqqqqqqqqqqqqqqq");
                         // console.debug(res.data.object);
-                        this.productType2=res.data.object;
+                        this.productType2 = res.data.object;
                     });
             },
             //获取productBrand的treedata
@@ -186,7 +188,7 @@
                 // console.debug(fileList);
                 var filePath = this.form.logo;
                 console.debug(filePath);
-                if(filePath){
+                if (filePath) {
                     this.$http.delete("/common/fastDfs/deleteFile?filePath=" + filePath)
                         .then(res => {
                             if (res.data.success) {
@@ -195,14 +197,14 @@
                                     type: 'success'
                                 });
                                 //将表单封装logo信息为空
-                                this.form.logo='';
+                                this.form.logo = '';
                                 this.getBrands();//更新表单数据
                             } else {
                                 this.$message({
                                     message: '删除失败!',
                                     type: 'error'
                                 });
-                                this.form.logo='';
+                                this.form.logo = '';
                                 alert(this.form.logo);
                             }
                         })
@@ -267,12 +269,18 @@
                 // console.debug(index);
                 // console.debug(row);
                 // if (row.logo)
-
-                this.fileList2=[];//清空上传组件
+                this.fileList2 = [];//清空上传组件
                 //多级下拉框回显
                 this.getProductBrandTreeData();
                 //北京1,2,3
                 this.getProductTypeAllPid(row);
+                //回显缩略图
+                if(row.logo){
+                    this.fileList2.push({
+                        "url": this.staticIp + row.logo,
+                        // 'lg':row.logo
+                    })
+                }
                 // this.productType2= [ 421, 443, 447 ];
                 //上传图片回显
                 // this.fileList2.push({
@@ -280,14 +288,11 @@
                 //     "lg":row.logo
                 // });
                 console.debug(this.fileList2);
-                this.formVisible = true;
+
                 //回显 要提交后台
                 this.form = Object.assign({}, row);
-                //回显缩略图
-                this.fileList2.push({
-                    "url": this.staticIp + row.logo,
-                    // 'lg':row.logo
-                })
+
+                this.formVisible = true;
             },
             //显示新增界面
             handleAdd: function () {
